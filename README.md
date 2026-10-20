@@ -33,12 +33,14 @@ Also set Termux's battery usage to **Unrestricted** (Settings → Apps → Termu
 
 ## KeX app: `Connection refused` on `localhost` port 5901
 
-No VNC server is running, usually because KeX crashed or was killed and left stale lock
-files. Inside Kali run:
+The VNC server isn't running. Often it starts and then quits a few seconds later because
+newer TigerVNC reads `~/.config/tigervnc/` and ignores NetHunter's `~/.vnc/xstartup`.
+Inside Kali (the `kali@localhost` prompt) run:
 
 ```bash
-./fix-vnc-connect.sh
+curl -fsSL https://raw.githubusercontent.com/geoworkart/kex-seamless-auto-fix/claude/fix-jo0bfs/fix-kex.sh | bash
 ```
 
-Keep Termux running in the background (see the section above), then connect in the KeX
-app to `localhost:5901` with your KeX password.
+It writes a working desktop startup script, clears stale locks, disables the power
+manager, starts KeX and checks that it stays up. When it prints `[OK]`, open the KeX app
+and tap **Connect**.

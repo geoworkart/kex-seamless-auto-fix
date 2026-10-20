@@ -30,3 +30,15 @@ adb shell "settings put global settings_enable_monitor_phantom_procs false"
 ```
 
 Also set Termux's battery usage to **Unrestricted** (Settings → Apps → Termux → Battery).
+
+## KeX app: `Connection refused` on `localhost` port 5901
+
+No VNC server is running, usually because KeX crashed or was killed and left stale lock
+files. Inside Kali run:
+
+```bash
+./fix-vnc-connect.sh
+```
+
+Keep Termux running in the background (see the section above), then connect in the KeX
+app to `localhost:5901` with your KeX password.

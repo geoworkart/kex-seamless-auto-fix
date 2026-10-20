@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Silence the xfce4-power-manager D-Bus/systemd error flood in KeX sessions.
 #
-# In a chroot/WSL there is no systemd and usually no system D-Bus, so
+# In NetHunter rootless (Termux/proot) there is no systemd and no system D-Bus, so
 # xfce4-power-manager spams the VNC log with:
 #   GLib-GIO-CRITICAL: g_dbus_proxy_call_sync_internal: assertion 'G_IS_DBUS_PROXY (proxy)' failed
 #   Failed to get a systemd proxy: Could not connect: No such file or directory
 #   Unable to connect to the system bus
-# Power management is meaningless there, so stop it from autostarting.
+# Android handles power itself, so stop it from autostarting.
 #
 # Usage: ./fix-power-manager.sh [--system-dbus]
-#   --system-dbus  also start a system D-Bus daemon (needs sudo), which
+#   --system-dbus  also start a system D-Bus daemon (uses sudo if not root), which
 #                  silences "system bus" errors from other apps too.
 
 set -euo pipefail
@@ -47,7 +47,7 @@ if [[ "${1:-}" == "--system-dbus" ]]; then
         [[ $EUID -ne 0 ]] && SUDO="sudo"
         $SUDO mkdir -p /run/dbus
         $SUDO rm -f /run/dbus/pid
-        $SUDO dbus-daemon --system --fork
+        $SUDO dbus-daemon --system --fork || { echo "[!] Could not start system D-Bus (harmless; power manager is already disabled)"; exit 0; }
         echo "[+] Started system D-Bus"
     fi
 fi

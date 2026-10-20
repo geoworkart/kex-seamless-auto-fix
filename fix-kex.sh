@@ -21,6 +21,7 @@ PORT=$((5900 + DISPLAY_NUM))
 SUDO=""
 [[ $EUID -ne 0 ]] && SUDO="sudo"
 
+echo "fix-kex.sh v3"
 echo "[1/5] Checking dbus-launch"
 if ! command -v dbus-launch >/dev/null; then
     $SUDO apt-get update -qq && $SUDO apt-get install -y -qq dbus-x11
@@ -32,12 +33,19 @@ XSTARTUP_BODY='#!/bin/sh
 unset SESSION_MANAGER DBUS_SESSION_BUS_ADDRESS
 export XDG_RUNTIME_DIR=/tmp/runtime-$(id -u)
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
-eval "$(dbus-launch --sh-syntax)"
-trap '"'"'kill "$DBUS_SESSION_BUS_PID" 2>/dev/null'"'"' EXIT
 # Newer TigerVNC shuts the server down as soon as this script exits, so stay
-# in the foreground and restart XFCE if it quits, until the server is gone.
+# in the foreground and restart XFCE (with a fresh session bus) if it quits.
 while pgrep -x "Xtigervnc|Xvnc" >/dev/null; do
-    startxfce4
+    echo "fix-kex: starting XFCE $(date +%T)"
+    if command -v dbus-run-session >/dev/null; then
+        dbus-run-session -- startxfce4
+    else
+        eval "$(dbus-launch --sh-syntax)"
+        startxfce4
+        kill "$DBUS_SESSION_BUS_PID" 2>/dev/null
+        unset DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
+    fi
+    echo "fix-kex: XFCE exited with code $? $(date +%T)"
     sleep 3
 done'
 for dir in "$HOME/.config/tigervnc" "$HOME/.vnc"; do
@@ -103,9 +111,18 @@ if port_open; then
     echo "     Keep Termux open in the background (pull down its notification -> Acquire wakelock)."
 else
     echo
-    echo "[FAIL] KeX did not stay running. Screenshot this log and send it:"
+    echo "[FAIL] KeX did not stay running. Screenshot everything below and send it."
     LOG=$(ls -t "$HOME"/.local/state/tigervnc/*.log "$HOME"/.config/tigervnc/*.log "$HOME"/.vnc/*.log 2>/dev/null | head -1)
-    [[ -n "$LOG" ]] && tail -40 "$LOG" | grep -v -e xfce4-power-manager -e '^$'
+    echo "--- log: ${LOG:-none found} (known harmless noise hidden)"
+    if [[ -n "$LOG" ]]; then
+        cp "$LOG" "$HOME/kex-debug.log"
+        grep -v -E 'GLib-GIO-CRITICAL|GLib-CRITICAL|Error creating proxy|GVFS-WARNING|connection is closed|g-io-error-quark|lost on the message dbus|power-manager|blueman|Traceback|^ +File "|^ +[~^]+$|setup_icon_path|prepend_search_path|app = |GDK_IS_SCREEN|^ *$' \
+            "$LOG" | tail -30
+    fi
+    echo "--- processes:"
+    ps -eo pid,args 2>/dev/null | grep -E 'Xtigervnc|Xvnc|xstartup|xfce4-session|dbus-daemon' | grep -v grep
+    echo "--- xstartup in use:"
+    head -3 "$HOME/.config/tigervnc/xstartup"
     echo
     echo "Most likely Android killed it. On the phone:"
     echo "  Settings > Developer options > turn ON 'Disable child process restrictions'"
